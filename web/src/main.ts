@@ -5,13 +5,16 @@ import { renderCards } from "./cards";
 import { fallbackJars, fallbackTools } from "./fallback-data";
 import { renderFacts } from "./facts";
 import { renderShelf } from "./shelf";
+import { mountPantry } from "./pantry";
+import { mountSuggest } from "./suggest";
 import { createAppState } from "./state";
-import type { Jar, Stats, Tool } from "./types";
+import type { Jar, LicenseCount, Stats, Tool } from "./types";
 
 const SLICE_SIZE = 12;
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const api = createApi();
 const state = createAppState();
+let activeCleanup: (() => void) | undefined;
 
 function fallbackStats(): Stats {
   const licenses = new Map<string, number>();
@@ -193,7 +196,11 @@ async function mountHome(): Promise<void> {
   document.querySelector<HTMLButtonElement>(".theme-toggle")!.addEventListener("click", () => {
     document.documentElement.dataset.theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   });
-  state.subscribe(render);
+  const unsubscribe = state.subscribe(render);
+  activeCleanup = () => {
+    unsubscribe();
+    board?.destroy();
+  };
 
   try {
     jars = await api.getJars();
@@ -233,4 +240,41 @@ async function mountHome(): Promise<void> {
   }
 }
 
-void mountHome();
+async function loadRouteData(): Promise<{ jars: Jar[]; licenses: LicenseCount[]; fallback?: true }> {
+  try {
+    const [jars, licenses] = await Promise.all([api.getJars(), api.getLicenses()]);
+    return { jars, licenses };
+  } catch {
+    const counts = new Map<string, number>();
+    for (const tool of fallbackTools) {
+      counts.set(tool.licenseFamily, (counts.get(tool.licenseFamily) ?? 0) + 1);
+    }
+    return {
+      jars: fallbackJars,
+      licenses: [...counts].map(([family, count]) => ({ family, count })),
+      fallback: true,
+    };
+  }
+}
+
+async function route(): Promise<void> {
+  activeCleanup?.();
+  activeCleanup = undefined;
+  const hash = window.location.hash;
+  if (hash === "#pantry") {
+    const { jars, licenses, fallback } = await loadRouteData();
+    if (window.location.hash === "#pantry") {
+      mountPantry(app, { api, state, jars, licenses, fallbackTools: fallback ? fallbackTools : undefined });
+    }
+    return;
+  }
+  if (hash === "#suggest") {
+    const { jars } = await loadRouteData();
+    if (window.location.hash === "#suggest") mountSuggest(app, { api, jars });
+    return;
+  }
+  await mountHome();
+}
+
+window.addEventListener("hashchange", () => void route());
+void route();
