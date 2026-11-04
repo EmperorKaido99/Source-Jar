@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Open Source Spread</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a gingham tablecloth; a plate with a slice of bread on the left, the pantry shelf and "Spread Facts" label on the right, found tools as a grid below. */
+:root {
+  --cloth: #EAF0F5;
+  --cloth-line: rgba(58, 98, 148, 0.10);
+  --ink: #17263A;
+  --ink-soft: #4C5C72;
+  --panel: #FFFFFF;
+  --rule: #CAD5E0;
+  --plate: #FDFEFF;
+  --plate-rim: #D9E1E9;
+  --plate-shadow: rgba(23, 38, 58, 0.18);
+  --jar: #B3203A;
+  --display: "Bagel Fat One", "Arial Rounded MT Bold", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --cloth: #0E1723; --cloth-line: rgba(120, 160, 215, 0.07); --ink: #E6EDF5; --ink-soft: #9DABBD;
+    --panel: #162232; --rule: #2A3B50; --plate: #2A3A4F; --plate-rim: #1E2B3C; --plate-shadow: rgba(0, 0, 0, 0.45);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --cloth: #0E1723; --cloth-line: rgba(120, 160, 215, 0.07); --ink: #E6EDF5; --ink-soft: #9DABBD;
+  --panel: #162232; --rule: #2A3B50; --plate: #2A3A4F; --plate-rim: #1E2B3C; --plate-shadow: rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background-color: var(--cloth);
+  background-image:
+    linear-gradient(90deg, var(--cloth-line) 50%, transparent 50%),
+    linear-gradient(var(--cloth-line) 50%, transparent 50%);
+  background-size: 40px 40px;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+  display: grid;
+  gap: 40px;
+}
+.top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 24px; }
+.brand { font-family: var(--display); font-size: 1.35rem; letter-spacing: 0.01em; }
+.mono { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.04em; color: var(--ink-soft); text-transform: uppercase; }
+
+.kitchen {
+  display: grid;
+  grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+  grid-template-areas: "stage intro" "stage controls";
+  grid-template-rows: auto 1fr;
+  gap: 24px 56px;
+  align-items: start;
+}
+.intro { grid-area: intro; display: grid; gap: 14px; align-self: end; }
+.controls { grid-area: controls; display: grid; gap: 22px; }
+h1 {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(2.6rem, 5.4vw, 4.4rem);
+  line-height: 0.95;
+  margin: 0;
+  text-wrap: balance;
+}
+.lede { margin: 0; max-width: 46ch; color: var(--ink-soft); font-size: 1.06rem; }
+
+/* Stage: plate + canvas */
+.stage { grid-area: stage; position: relative; width: 100%; max-width: 560px; aspect-ratio: 1; }
+.stage::before {
+  content: ""; position: absolute; inset: 4%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, var(--plate) 0 62%, var(--plate-rim) 63%, var(--plate) 70%, var(--plate-rim) 100%);
+  box-shadow: 0 18px 40px var(--plate-shadow), 0 2px 0 var(--plate-rim);
+}
+#board { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: none; display: block; }
+#board:focus-visible { outline: 3px solid var(--ink); outline-offset: 4px; border-radius: 8px; }
+.hint {
+  position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+  background: var(--ink); color: var(--cloth);
+  font-size: 0.85rem; font-weight: 600; padding: 6px 14px; border-radius: 999px;
+  white-space: nowrap; pointer-events: none; transition: opacity 0.3s ease;
+}
+.hint.off { opacity: 0; }
+
+/* Jar shelf */
+.shelf-label { font-weight: 700; font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 8px; }
+.shelf {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px;
+  padding-bottom: 10px; border-bottom: 6px solid var(--rule); border-radius: 0 0 3px 3px;
+}
+.jar {
+  appearance: none; border: 0; background: none; color: var(--ink); font: inherit;
+  display: grid; justify-items: center; gap: 8px; padding: 6px 2px 0; cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.jar:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; border-radius: 10px; }
+.glass {
+  position: relative; width: min(64px, 100%); aspect-ratio: 64 / 76;
+  margin-top: 12px;
+  border-radius: 12px 12px 16px 16px;
+  background: var(--c);
+  box-shadow: inset 7px 0 0 rgba(255, 255, 255, 0.28), inset -5px -5px 0 rgba(0, 0, 0, 0.14);
+}
+.glass::before {
+  content: ""; position: absolute; left: 6%; right: 6%; top: -13px; height: 15px;
+  border-radius: 5px 5px 2px 2px; background: var(--lid);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18);
+  background-image: repeating-linear-gradient(90deg, transparent 0 5px, rgba(0, 0, 0, 0.12) 5px 6px);
+}
+.glass span {
+  position: absolute; left: 0; right: 0; top: 34%; padding: 3px 2px;
+  background: #FFFDF7; color: #2A2016;
+  font-family: var(--display); font-size: 0.62rem; line-height: 1.1; text-align: center;
+}
+.jar-name { font-size: 0.78rem; font-weight: 600; line-height: 1.2; text-align: center; color: var(--ink-soft); }
+.jar[aria-pressed="true"] { transform: translateY(-8px); }
+.jar[aria-pressed="true"] .jar-name { color: var(--ink); font-weight: 800; }
+.jar:hover:not([aria-pressed="true"]) { transform: translateY(-3px); }
+
+.now { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 1rem; margin: 0; }
+.dot { width: 14px; height: 14px; border-radius: 50% 40% 55% 45%; background: var(--jar); flex: none; }
+.now b { font-weight: 800; }
+.now span.kind { color: var(--ink-soft); }
+
+.buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn {
+  appearance: none; font: inherit; font-weight: 700; font-size: 0.95rem;
+  padding: 11px 18px; border-radius: 999px; cursor: pointer;
+  border: 2px solid var(--ink); background: var(--ink); color: var(--cloth);
+  transition: transform 0.12s ease;
+}
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+/* Spread Facts (nutrition label) */
+.facts {
+  background: var(--panel); border: 2px solid var(--ink); padding: 10px 14px 12px;
+  max-width: 340px; font-size: 0.9rem; line-height: 1.3;
+}
+.facts h2 { font-family: var(--body); font-weight: 800; font-size: 1.9rem; letter-spacing: -0.02em; margin: 0; line-height: 1; }
+.facts .serving { margin: 4px 0 0; padding-bottom: 6px; border-bottom: 10px solid var(--ink); }
+.facts .big { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 5px solid var(--ink); font-weight: 800; }
+.facts .big strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.facts .head { display: flex; justify-content: flex-end; font-weight: 700; font-size: 0.75rem; padding: 4px 0 2px; border-bottom: 1px solid var(--ink); }
+.facts ul { list-style: none; margin: 0; padding: 0; }
+.facts li { display: grid; grid-template-columns: 1fr auto 3.2em; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--ink); font-variant-numeric: tabular-nums; }
+.facts li b { font-weight: 800; }
+.facts li .pct { text-align: right; font-weight: 800; }
+.facts .foot { margin: 6px 0 0; padding-top: 6px; border-top: 6px solid var(--ink); font-size: 0.75rem; color: var(--ink-soft); }
+
+/* Found tools */
+.found-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; margin-bottom: 16px; }
+.found-head h2 { margin: 0; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.01em; text-wrap: balance; }
+.found-head p { margin: 0; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+.card {
+  min-width: 0; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 14px 16px; display: grid; gap: 6px; align-content: start;
+}
+.card .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.card h3 { margin: 0; font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.card h3 .dot { width: 11px; height: 11px; }
+.lic {
+  font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft);
+  border: 1px solid var(--rule); border-radius: 4px; padding: 1px 6px; white-space: nowrap; flex: none;
+  max-width: 50%; overflow: hidden; text-overflow: ellipsis;
+}
+.card p { margin: 0; color: var(--ink-soft); font-size: 0.92rem; }
+.card a { color: var(--ink); font-weight: 700; font-size: 0.88rem; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.card a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.card.hidden {
+  background: transparent; border: 2px dashed var(--rule); color: var(--ink-soft);
+  min-height: 112px; align-content: center; justify-items: center; text-align: center;
+}
+.card.hidden b { font-weight: 700; }
+.card.hidden small { font-size: 0.8rem; }
+.card.fresh { animation: plop 0.5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes plop { from { transform: scale(0.9); opacity: 0.3; } to { transform: none; opacity: 1; } }
+
+.note { margin: 0; font-size: 0.85rem; color: var(--ink-soft); max-width: 70ch; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 860px) {
+  .kitchen { grid-template-columns: minmax(0, 1fr); grid-template-areas: "intro" "stage" "controls"; gap: 24px; }
+  .stage { justify-self: center; }
+  .facts { max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card.fresh { animation: none; }
+  .jar, .btn { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <span class="brand">Open Source Spread</span>
+    <span class="mono">60 free tools · 5 jars · 1 knife</span>
+  </header>
+
+  <section class="kitchen" aria-label="Sandwich station">
+    <div class="intro">
+      <h1>Spread the source.</h1>
+      <p class="lede">Pick a jar, grab the knife and drag it across the bread. Every swipe uncovers free software that anyone can use, study, change and share.</p>
+    </div>
+
+    <div class="stage" id="stage">
+      <canvas id="board" tabindex="0" role="img" aria-label="A slice of bread. Drag across it to spread the jar and uncover open source tools."></canvas>
+      <div class="hint off" id="hint">Drag the knife across the bread</div>
+    </div>
+
+    <div class="controls">
+      <div>
+        <p class="shelf-label" id="shelf-label">The pantry</p>
+        <div class="shelf" id="shelf" role="group" aria-labelledby="shelf-label"></div>
+      </div>
+      <p class="now" id="now"></p>
+      <div class="buttons">
+        <button class="btn" id="spread-all" type="button">Spread the whole slice</button>
+        <button class="btn ghost" id="fresh" type="button">Fresh slice</button>
+      </div>
+      <div class="facts" aria-label="Spread facts">
+        <h2>Spread Facts</h2>
+        <p class="serving">Serving size 1 slice · 5 jars per pantry</p>
+        <div class="big"><span>Tools found</span><strong id="facts-total">0 / 60</strong></div>
+        <div class="head">% of found</div>
+        <ul id="facts-list"></ul>
+        <p class="foot">Each tool lists its project's main license. SQLite is public domain; the rest use OSI-approved licenses.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="found-title">
+    <div class="found-head">
+      <h2 id="found-title">Found in Strawberry Jam</h2>
+      <p id="found-count">0 of 12 found</p>
+    </div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <p class="note">Licenses shown are each project's primary license; some projects include parts under other terms. Every link goes to the project's own site or repository.</p>
+  <div class="sr" aria-live="polite" id="live"></div>
+</div>
+
+<script>
+const JARS = [
+  { id: "pb", name: "Peanut Butter", tag: "Peanut", kind: "Operating systems & servers",
+    color: "#C98A3F", dark: "#6E3F12", light: "#EBC07F", lid: "#B5332F",
+    tools: [
+      { n: "Linux", lic: "GPL-2.0", d: "The kernel under Android, most servers and every top supercomputer.", url: "https://kernel.org" },
+      { n: "Debian", lic: "DFSG mix", d: "Community Linux distribution that Ubuntu and many others build on.", url: "https://www.debian.org" },
+      { n: "FreeBSD", lic: "BSD-2-Clause", d: "Unix-like operating system known for its networking stack and ZFS.", url: "https://www.freebsd.org" },
+      { n: "Kubernetes", lic: "Apache-2.0", d: "Schedules and scales containers across a cluster of machines.", url: "https://kubernetes.io" },
+      { n: "Podman", lic: "Apache-2.0", d: "Builds and runs containers without a background daemon.", url: "https://podman.io" },
+      { n: "nginx", lic: "BSD-2-Clause", d: "Web server and reverse proxy in front of a big share of the web.", url: "https://nginx.org" },
+      { n: "Apache HTTP Server", s: "Apache httpd", lic: "Apache-2.0", d: "The web server that ran the early web, still widely deployed.", url: "https://httpd.apache.org" },
+      { n: "OpenSSH", lic: "BSD", d: "Secure remote login and file transfer, on almost every server.", url: "https://www.openssh.com" },
+      { n: "OpenTofu", lic: "MPL-2.0", d: "Infrastructure as code, a community fork of Terraform.", url: "https://opentofu.org" },
+      { n: "Prometheus", lic: "Apache-2.0", d: "Collects metrics and fires alerts for your services.", url: "https://prometheus.io" },
+      { n: "Caddy", lic: "Apache-2.0", d: "Web server that sets up HTTPS certificates for you.", url: "https://caddyserver.com" },
+      { n: "Ansible", lic: "GPL-3.0", d: "Automates server setup with plain YAML playbooks over SSH.", url: "https://github.com/ansible/ansible" }
+    ] },
+  { id: "jam", name: "Strawberry Jam", tag: "Jam", kind: "Languages & runtimes",
+    color: "#B71E3B", dark: "#5A0717", light: "#E85A73", lid: "#F2EBDD",
+    tools: [
+      { n: "Python", lic: "PSF-2.0", d: "Readable general-purpose language behind most data science and AI work.", url: "https://www.python.org" },
+      { n: "Rust", lic: "MIT / Apache-2.0", d: "Systems language with memory safety checked at compile time.", url: "https://www.rust-lang.org" },
+      { n: "Go", lic: "BSD-3-Clause", d: "Simple compiled language built at Google for networked services.", url: "https://go.dev" },
+      { n: "Node.js", lic: "MIT", d: "Runs JavaScript outside the browser, on servers and in tooling.", url: "https://nodejs.org" },
+      { n: "TypeScript", lic: "Apache-2.0", d: "JavaScript with types, compiled down to plain JavaScript.", url: "https://www.typescriptlang.org" },
+      { n: "Ruby", lic: "Ruby / BSD-2-Clause", d: "Expressive scripting language designed for programmer happiness.", url: "https://www.ruby-lang.org" },
+      { n: "PHP", lic: "PHP-3.01", d: "Server-side language that powers WordPress and much of the web.", url: "https://www.php.net" },
+      { n: "Kotlin", lic: "Apache-2.0", d: "Modern JVM language and the default choice for Android apps.", url: "https://kotlinlang.org" },
+      { n: "Swift", lic: "Apache-2.0", d: "Apple's fast, safe language, also usable on Linux and Windows.", url: "https://www.swift.org" },
+      { n: "Elixir", lic: "Apache-2.0", d: "Functional language on the Erlang VM for fault-tolerant systems.", url: "https://elixir-lang.org" },
+      { n: "Zig", lic: "MIT", d: "Low-level language and C toolchain with no hidden control flow.", url: "https://ziglang.org" },
+      { n: "LLVM", lic: "Apache-2.0 + LLVM exception", d: "Compiler toolkit behind Clang, Rust, Swift and many more.", url: "https://llvm.org" }
+    ] },
+  { id: "mustard", name: "Mustard", tag: "Mustard", kind: "Developer tools & frameworks",
+    color: "#E2B320", dark: "#7A5600", light: "#F7DA6A", lid: "#2F5C3A",
+    tools: [
+      { n: "Git", lic: "GPL-2.0", d: "Version control that tracks every change to your code.", url: "https://git-scm.com" },
+      { n: "Neovim", lic: "Apache-2.0 / Vim", d: "Extensible, keyboard-driven text editor descended from Vim.", url: "https://neovim.io" },
+      { n: "Emacs", lic: "GPL-3.0", d: "Endlessly programmable editor, in use since the 1970s.", url: "https://www.gnu.org/software/emacs/" },
+      { n: "VSCodium", lic: "MIT", d: "Community build of VS Code without Microsoft telemetry or branding.", url: "https://vscodium.com" },
+      { n: "curl", lic: "curl (MIT-style)", d: "Command-line tool and library for moving data over URLs.", url: "https://curl.se" },
+      { n: "Jupyter", lic: "BSD-3-Clause", d: "Notebooks that mix live code, charts and notes.", url: "https://jupyter.org" },
+      { n: "React", lic: "MIT", d: "Component-based library for building user interfaces.", url: "https://react.dev" },
+      { n: "Vue", lic: "MIT", d: "Approachable framework for building web interfaces.", url: "https://vuejs.org" },
+      { n: "Svelte", lic: "MIT", d: "UI framework that compiles components into small, fast JavaScript.", url: "https://svelte.dev" },
+      { n: "Vite", lic: "MIT", d: "Fast dev server and build tool for front-end projects.", url: "https://vite.dev" },
+      { n: "Django", lic: "BSD-3-Clause", d: "Python web framework with batteries included.", url: "https://www.djangoproject.com" },
+      { n: "Ruby on Rails", s: "Rails", lic: "MIT", d: "Ruby web framework that popularized convention over configuration.", url: "https://rubyonrails.org" }
+    ] },
+  { id: "guac", name: "Guacamole", tag: "Guac", kind: "Data, databases & AI",
+    color: "#86A83C", dark: "#33500C", light: "#BCD872", lid: "#3A3A3E",
+    tools: [
+      { n: "PostgreSQL", lic: "PostgreSQL", d: "Advanced relational database trusted for decades.", url: "https://www.postgresql.org" },
+      { n: "SQLite", lic: "Public domain", d: "A whole SQL database in one file, inside nearly every phone.", url: "https://sqlite.org" },
+      { n: "MariaDB", lic: "GPL-2.0", d: "Community-developed fork of MySQL.", url: "https://mariadb.org" },
+      { n: "Valkey", lic: "BSD-3-Clause", d: "Fast in-memory key-value store, forked from Redis.", url: "https://valkey.io" },
+      { n: "DuckDB", lic: "MIT", d: "In-process analytics database that queries files directly.", url: "https://duckdb.org" },
+      { n: "ClickHouse", lic: "Apache-2.0", d: "Column-oriented database for real-time analytics at scale.", url: "https://clickhouse.com" },
+      { n: "Apache Kafka", s: "Kafka", lic: "Apache-2.0", d: "Streams events between systems at very high volume.", url: "https://kafka.apache.org" },
+      { n: "Apache Spark", s: "Spark", lic: "Apache-2.0", d: "Processes huge datasets across many machines.", url: "https://spark.apache.org" },
+      { n: "pandas", lic: "BSD-3-Clause", d: "DataFrames for cleaning and analyzing data in Python.", url: "https://pandas.pydata.org" },
+      { n: "NumPy", lic: "BSD-3-Clause", d: "Fast arrays and math, the base of scientific Python.", url: "https://numpy.org" },
+      { n: "PyTorch", lic: "BSD-3-Clause", d: "Deep learning framework used to train many modern AI models.", url: "https://pytorch.org" },
+      { n: "Grafana", lic: "AGPL-3.0", d: "Dashboards for metrics, logs and traces.", url: "https://grafana.com/oss/grafana/" }
+    ] },
+  { id: "cocoa", name: "Cocoa Hazelnut", tag: "Cocoa", kind: "Everyday & creative apps",
+    color: "#5C3322", dark: "#1F0D05", light: "#94634A", lid: "#E9E1D2",
+    tools: [
+      { n: "Firefox", lic: "MPL-2.0", d: "Independent web browser from the nonprofit Mozilla.", url: "https://www.mozilla.org/firefox/" },
+      { n: "Blender", lic: "GPL-2.0+", d: "3D modeling, animation and rendering used in films and games.", url: "https://www.blender.org" },
+      { n: "GIMP", lic: "GPL-3.0", d: "Photo editing and image manipulation.", url: "https://www.gimp.org" },
+      { n: "Inkscape", lic: "GPL-2.0+", d: "Vector illustration built around the SVG format.", url: "https://inkscape.org" },
+      { n: "Krita", lic: "GPL-3.0", d: "Digital painting, made with and for artists.", url: "https://krita.org" },
+      { n: "LibreOffice", lic: "MPL-2.0", d: "Office suite with documents, spreadsheets and slides.", url: "https://www.libreoffice.org" },
+      { n: "VLC", lic: "GPL-2.0", d: "Media player that opens practically any video or audio file.", url: "https://www.videolan.org" },
+      { n: "Audacity", lic: "GPL-3.0", d: "Records and edits audio, from podcasts to music.", url: "https://www.audacityteam.org" },
+      { n: "OBS Studio", s: "OBS", lic: "GPL-2.0", d: "Records and live-streams your screen and cameras.", url: "https://obsproject.com" },
+      { n: "Thunderbird", lic: "MPL-2.0", d: "Email, calendar and contacts client from Mozilla.", url: "https://www.thunderbird.net" },
+      { n: "Signal", lic: "AGPL-3.0", d: "End-to-end encrypted messaging and calls.", url: "https://signal.org" },
+      { n: "KeePassXC", lic: "GPL-3.0", d: "Password manager that keeps your vault offline.", url: "https://keepassxc.org" }
+    ] }
+];
+const TOTAL = JARS.reduce((a, j) => a + j.tools.length, 0);
+const DISPLAY = '"Bagel Fat One", "Arial Rounded MT Bold", "Trebuchet MS", sans-serif';
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const $ = (id) => document.getElementById(id);
+const stageEl = $("stage"), cv = $("board"), ctx = cv.getContext("2d");
+const mk = () => document.createElement("canvas");
+const maskC = mk(), streakC = mk(), sauceC = mk(), breadC = mk();
+const mctx = maskC.getContext("2d", { willReadFrequently: true });
+const stctx = streakC.getContext("2d"), sctx = sauceC.getContext("2d"), bctx = breadC.getContext("2d");
+
+let S = 0, DPR = 1, geo = null, slots = [];
+let jarIdx = 1;
+const found = Object.fromEntries(JARS.map((j) => [j.id, new Set()]));
+let onSlice = new Set();
+const popT = {};
+let freshCard = -1;
+let dirty = true;
+
+function mulberry(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- Geometry ---------- */
+function breadPath(x0, x1, y0, y1, w, h, r) {
+  const p = new Path2D(), cx = (x0 + x1) / 2, ys = y0 + h * 0.36;
+  p.moveTo(x0 + r, y1);
+  p.lineTo(x1 - r, y1);
+  p.quadraticCurveTo(x1, y1, x1, y1 - r);
+  p.lineTo(x1, ys);
+  p.bezierCurveTo(x1 + w * 0.10, ys - h * 0.06, x1 + w * 0.07, y0, cx, y0);
+  p.bezierCurveTo(x0 - w * 0.07, y0, x0 - w * 0.10, ys - h * 0.06, x0, ys);
+  p.lineTo(x0, y1 - r);
+  p.quadraticCurveTo(x0, y1, x0 + r, y1);
+  p.closePath();
+  return p;
+}
+function computeGeo() {
+  const w = S * 0.72, h = S * 0.76, cx = S / 2;
+  const x0 = cx - w / 2, x1 = cx + w / 2, y0 = S * 0.09, y1 = y0 + h;
+  const inset = S * 0.038;
+  return {
+    w, h, cx, x0, x1, y0, y1, inset,
+    outer: breadPath(x0, x1, y0, y1, w, h, S * 0.05),
+    inner: breadPath(x0 + inset, x1 - inset, y0 + inset, y1 - inset, w - 2 * inset, h - 2 * inset, S * 0.03),
+    R: S * 0.075
+  };
+}
+
+function drawBread() {
+  const b = bctx;
+  b.setTransform(DPR, 0, 0, DPR, 0, 0);
+  b.clearRect(0, 0, S, S);
+  b.save();
+  b.shadowColor = "rgba(40, 25, 10, 0.30)"; b.shadowBlur = S * 0.035; b.shadowOffsetY = S * 0.014;
+  const cg = b.createLinearGradient(0, geo.y0, 0, geo.y1);
+  cg.addColorStop(0, "#9C5A22"); cg.addColorStop(0.5, "#B87436"); cg.addColorStop(1, "#C98D4A");
+  b.fillStyle = cg; b.fill(geo.outer);
+  b.restore();
+  // crust grain
+  b.save(); b.clip(geo.outer);
+  const rc = mulberry(11);
+  for (let i = 0; i < 500; i++) {
+    b.fillStyle = `rgba(${rc() < 0.5 ? "90,45,10" : "230,170,100"},${0.08 + rc() * 0.12})`;
+    b.fillRect(geo.x0 - geo.w * 0.1 + rc() * geo.w * 1.2, geo.y0 + rc() * geo.h, 1 + rc() * 2, 1 + rc() * 2);
+  }
+  b.restore();
+  // crumb
+  b.save(); b.clip(geo.inner);
+  const g = b.createRadialGradient(geo.cx, geo.y0 + geo.h * 0.5, S * 0.05, geo.cx, geo.y0 + geo.h * 0.5, S * 0.48);
+  g.addColorStop(0, "#FAEDCF"); g.addColorStop(1, "#EBD19E");
+  b.fillStyle = g; b.fillRect(0, 0, S, S);
+  const rnd = mulberry(7), k = S / 500;
+  for (let i = 0; i < 1500; i++) {
+    const x = geo.x0 - geo.w * 0.06 + rnd() * geo.w * 1.12, y = geo.y0 + rnd() * geo.h;
+    const r = (0.5 + rnd() * rnd() * 3.4) * k;
+    b.fillStyle = `rgba(150, 102, 48, ${0.08 + rnd() * 0.18})`;
+    b.beginPath(); b.ellipse(x, y, r * 1.5, r, rnd() * Math.PI, 0, Math.PI * 2); b.fill();
+  }
+  for (let i = 0; i < 700; i++) {
+    b.fillStyle = `rgba(255, 251, 238, ${0.3 + rnd() * 0.4})`;
+    b.fillRect(geo.x0 + rnd() * geo.w, geo.y0 + rnd() * geo.h, 1.2 * k, 1.2 * k);
+  }
+  b.lineWidth = S * 0.026; b.strokeStyle = "rgba(196, 136, 64, 0.30)"; b.stroke(geo.inner);
+  b.restore();
+}
+
+function layoutSlots() {
+  const jar = JARS[jarIdx], cols = 3;
+  const left = geo.x0 + geo.inset + S * 0.02, right = geo.x1 - geo.inset - S * 0.02;
+  const top = geo.y0 + geo.h * 0.19, bottom = geo.y1 - geo.inset - S * 0.035;
+  const rows = Math.ceil(jar.tools.length / cols);
+  const cw = (right - left) / cols, rh = (bottom - top) / rows;
+  const rnd = mulberry(jarIdx * 31 + 3);
+  slots = jar.tools.map((t, i) => {
+    const c = i % cols, r = Math.floor(i / cols);
+    const x = left + cw * (c + 0.5) + (rnd() - 0.5) * cw * 0.12;
+    const y = top + rh * (r + 0.5) + (rnd() - 0.5) * rh * 0.16;
+    const label = t.s || t.n;
+    let size = S * 0.042;
+    ctx.font = `${size}px ${DISPLAY}`;
+    let tw = ctx.measureText(label).width;
+    const maxW = cw * 0.9;
+    if (tw > maxW) { size *= maxW / tw; tw = maxW; }
+    return { x, y, rot: (rnd() - 0.5) * 0.18, size, tw, label };
+  });
+  geo.rowsY = Array.from({ length: rows }, (_, r) => top + rh * (r + 0.5));
+  geo.left = geo.x0 + geo.inset; geo.right = geo.x1 - geo.inset;
+}
+
+function resize() {
+  const newS = Math.round(stageEl.clientWidth);
+  const newD = Math.min(2, window.devicePixelRatio || 1);
+  if (!newS || (newS === S && newD === DPR)) return;
+  let keepM = null, keepSt = null;
+  if (S) {
+    keepM = mk(); keepM.width = maskC.width; keepM.height = maskC.height; keepM.getContext("2d").drawImage(maskC, 0, 0);
+    keepSt = mk(); keepSt.width = streakC.width; keepSt.height = streakC.height; keepSt.getContext("2d").drawImage(streakC, 0, 0);
+  }
+  const ratio = S ? newS / S : 1;
+  S = newS; DPR = newD;
+  for (const c of [cv, maskC, streakC, sauceC, breadC]) { c.width = Math.round(S * DPR); c.height = Math.round(S * DPR); }
+  geo = computeGeo();
+  drawBread();
+  layoutSlots();
+  if (keepM) {
+    mctx.drawImage(keepM, 0, 0, maskC.width, maskC.height);
+    stctx.drawImage(keepSt, 0, 0, streakC.width, streakC.height);
+  }
+  knife.x *= ratio; knife.y *= ratio;
+  if (!knife.active) parkKnife(true);
+  dirty = true;
+}
+
+/* ---------- Spreading ---------- */
+const stampC = mk();
+stampC.width = stampC.height = 64;
+(() => {
+  const s = stampC.getContext("2d");
+  const g = s.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.8, "rgba(255,255,255,1)"); g.addColorStop(1, "rgba(255,255,255,0)");
+  s.fillStyle = g; s.fillRect(0, 0, 64, 64);
+})();
+
+let spreadPending = false;
+function spreadSegment(a, b) {
+  const R = geo.R, dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy);
+  const ang = dist > 0.5 ? Math.atan2(dy, dx) : knife.moveAng;
+  if (dist > 0.5) knife.moveAng = ang;
+  const steps = Math.max(1, Math.ceil(dist / (R * 0.22)));
+  mctx.save();
+  mctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  mctx.clip(geo.inner);
+  mctx.globalAlpha = 0.42;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps, x = a.x + dx * t, y = a.y + dy * t;
+    mctx.save(); mctx.translate(x, y); mctx.rotate(ang);
+    mctx.drawImage(stampC, -R * 0.6, -R, R * 1.2, R * 2);
+    mctx.restore();
+  }
+  mctx.restore();
+  if (dist > 0.5) {
+    const jar = JARS[jarIdx], nx = -dy / dist, ny = dx / dist;
+    stctx.save(); stctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    stctx.lineCap = "round";
+    for (let k = -3; k <= 3; k++) {
+      const off = k * R * 0.27 + Math.sin(k * 7.3) * 2;
+      stctx.strokeStyle = k % 2 ? jar.light : jar.dark;
+      stctx.globalAlpha = k % 2 ? 0.30 : 0.14;
+      stctx.lineWidth = (k % 2 ? 1.6 : 1.1) * S / 500;
+      stctx.beginPath(); stctx.moveTo(a.x + nx * off, a.y + ny * off); stctx.lineTo(b.x + nx * off, b.y + ny * off); stctx.stroke();
+    }
+    stctx.restore();
+  }
+  spreadPending = true;
+  dirty = true;
+}
+
+let lastCheck = 0;
+function checkReveal() {
+  spreadPending = false;
+  const W = maskC.width, H = maskC.height;
+  slots.forEach((s, i) => {
+    if (onSlice.has(i)) return;
+    const hw = s.tw / 2, hh = s.size * 0.42;
+    const x0 = Math.max(0, Math.floor((s.x - hw) * DPR)), y0 = Math.max(0, Math.floor((s.y - hh) * DPR));
+    const w = Math.max(1, Math.min(W - x0, Math.ceil(2 * hw * DPR))), h = Math.max(1, Math.min(H - y0, Math.ceil(2 * hh * DPR)));
+    const data = mctx.getImageData(x0, y0, w, h).data;
+    let hit = 0, tot = 0;
+    for (let gy = 0; gy < 3; gy++) for (let gx = 0; gx < 7; gx++) {
+      const px = Math.floor(((gx + 0.5) / 7) * w), py = Math.floor(((gy + 0.5) / 3) * h);
+      tot++; if (data[(py * w + px) * 4 + 3] > 110) hit++;
+    }
+    if (hit / tot >= 0.62) reveal(i);
+  });
+}
+
+function reveal(i) {
+  const jar = JARS[jarIdx];
+  onSlice.add(i);
+  popT[i] = reduceMotion ? -1e6 : performance.now();
+  const isNew = !found[jar.id].has(i);
+  found[jar.id].add(i);
+  if (isNew) {
+    freshCard = i;
+    renderCards();
+    renderFacts();
+    $("live").textContent = `Found ${jar.tools[i].n}`;
+  }
+  dirty = true;
+}
+
+/* ---------- Knife ---------- */
+const knife = { x: 0, y: 0, ang: 1.45, targetAng: 1.45, moveAng: 0, active: false, parking: false, px: 0, py: 0, pang: 1.45 };
+const BASE_ANG = 0.62;
+function parkPos() { return { x: S * 0.17, y: S * 0.935, ang: 1.5 }; }
+function parkKnife(instant) {
+  const p = parkPos();
+  knife.active = false;
+  if (instant || reduceMotion) { knife.x = p.x; knife.y = p.y; knife.ang = p.ang; knife.parking = false; }
+  else knife.parking = true;
+  knife.targetAng = p.ang;
+  dirty = true;
+}
+function setKnife(p) {
+  const vx = p.x - knife.x;
+  knife.x = p.x; knife.y = p.y; knife.active = true; knife.parking = false;
+  knife.targetAng = BASE_ANG + Math.max(-0.3, Math.min(0.3, vx * 0.02));
+  dirty = true;
+}
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath(); c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.quadraticCurveTo(x + w, y, x + w, y + r);
+  c.lineTo(x + w, y + h - r); c.quadraticCurveTo(x + w, y + h, x + w - r, y + h); c.lineTo(x + r, y + h);
+  c.quadraticCurveTo(x, y + h, x, y + h - r); c.lineTo(x, y + r); c.quadraticCurveTo(x, y, x + r, y); c.closePath();
+}
+function drawKnife() {
+  const jar = JARS[jarIdx];
+  const L = S * 0.21, W = S * 0.052, H = S * 0.16;
+  ctx.save();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.translate(knife.x, knife.y);
+  ctx.rotate(knife.ang);
+  ctx.shadowColor = "rgba(20, 15, 10, 0.35)"; ctx.shadowBlur = S * 0.02; ctx.shadowOffsetX = S * 0.01; ctx.shadowOffsetY = S * 0.012;
+  // blade: tip at origin, extends toward -y
+  const blade = new Path2D();
+  blade.moveTo(-W / 2, -W / 2);
+  blade.arc(0, -W / 2, W / 2, Math.PI, 0, true);
+  blade.lineTo(W * 0.36, -L);
+  blade.lineTo(-W * 0.36, -L);
+  blade.closePath();
+  const mg = ctx.createLinearGradient(-W / 2, 0, W / 2, 0);
+  mg.addColorStop(0, "#8E98A3"); mg.addColorStop(0.45, "#F3F6F9"); mg.addColorStop(1, "#AEB7C1");
+  ctx.fillStyle = mg; ctx.fill(blade);
+  ctx.shadowColor = "transparent";
+  // sauce on the blade
+  ctx.save(); ctx.clip(blade);
+  ctx.fillStyle = jar.color;
+  ctx.beginPath();
+  ctx.moveTo(-W, 0); ctx.lineTo(W, 0); ctx.lineTo(W, -L * 0.34);
+  ctx.quadraticCurveTo(W * 0.2, -L * 0.42, 0, -L * 0.33); ctx.quadraticCurveTo(-W * 0.4, -L * 0.25, -W, -L * 0.3);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "rgba(255,255,255,0.25)"; ctx.fillRect(-W * 0.25, -L * 0.3, W * 0.12, L * 0.24);
+  ctx.restore();
+  // bolster
+  ctx.fillStyle = "#C3CBD3"; roundRect(ctx, -W * 0.42, -L - S * 0.012, W * 0.84, S * 0.014, 2); ctx.fill();
+  // handle
+  ctx.shadowColor = "rgba(20, 15, 10, 0.35)"; ctx.shadowBlur = S * 0.02; ctx.shadowOffsetX = S * 0.01; ctx.shadowOffsetY = S * 0.012;
+  const hg = ctx.createLinearGradient(-W / 2, 0, W / 2, 0);
+  hg.addColorStop(0, "#1D1F25"); hg.addColorStop(0.4, "#3A3D46"); hg.addColorStop(1, "#16171C");
+  ctx.fillStyle = hg; roundRect(ctx, -W * 0.45, -L - S * 0.012 - H, W * 0.9, H, W * 0.4); ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.fillStyle = "#C3CBD3";
+  for (const f of [0.3, 0.7]) { ctx.beginPath(); ctx.arc(0, -L - S * 0.012 - H * f, W * 0.1, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+}
+
+/* ---------- Rendering ---------- */
+const easeOutBack = (t) => { const c1 = 1.9, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+function render(now) {
+  const jar = JARS[jarIdx];
+  const Wp = cv.width, Hp = cv.height;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, Wp, Hp);
+  ctx.drawImage(breadC, 0, 0);
+
+  const s = sctx;
+  s.setTransform(1, 0, 0, 1, 0, 0);
+  s.globalCompositeOperation = "source-over"; s.globalAlpha = 1;
+  s.clearRect(0, 0, Wp, Hp);
+  s.drawImage(maskC, 0, 0);
+  s.globalCompositeOperation = "source-in";
+  s.fillStyle = jar.color; s.fillRect(0, 0, Wp, Hp);
+  s.globalCompositeOperation = "source-atop";
+  s.drawImage(streakC, 0, 0);
+  s.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const sh = s.createRadialGradient(geo.x0 + geo.w * 0.3, geo.y0 + geo.h * 0.25, 0, geo.x0 + geo.w * 0.3, geo.y0 + geo.h * 0.25, S * 0.6);
+  sh.addColorStop(0, "rgba(255,255,255,0.24)"); sh.addColorStop(1, "rgba(255,255,255,0)");
+  s.fillStyle = sh; s.fillRect(0, 0, S, S);
+
+  let animating = false;
+  s.textAlign = "center"; s.textBaseline = "middle";
+  for (const i of onSlice) {
+    const sl = slots[i];
+    const t = Math.min(1, (now - popT[i]) / 380);
+    if (t < 1) animating = true;
+    const sc = 0.55 + 0.45 * easeOutBack(t);
+    s.save();
+    s.translate(sl.x, sl.y); s.rotate(sl.rot); s.scale(sc, sc);
+    s.font = `${sl.size}px ${DISPLAY}`;
+    s.globalAlpha = Math.min(1, t * 2.5);
+    s.fillStyle = jar.light; s.fillText(sl.label, 0, sl.size * 0.05);
+    s.fillStyle = jar.dark; s.fillText(sl.label, 0, -sl.size * 0.02);
+    s.restore();
+  }
+  s.globalCompositeOperation = "source-over";
+
+  ctx.save();
+  ctx.shadowColor = "rgba(60, 30, 10, 0.35)"; ctx.shadowBlur = 3 * DPR; ctx.shadowOffsetY = 1.5 * DPR;
+  ctx.drawImage(sauceC, 0, 0);
+  ctx.restore();
+
+  drawKnife();
+  return animating;
+}
+
+/* ---------- Auto spreading ---------- */
+let auto = null, lastP = null;
+function rowPass(y, fromLeft, pts) {
+  const n = 16, a = geo.left + S * 0.01, b = geo.right - S * 0.01;
+  for (let i = 0; i <= n; i++) {
+    const t = fromLeft ? i / n : 1 - i / n;
+    const x = a + (b - a) * t;
+    pts.push({ x, y: y + Math.sin(t * 9 + y) * S * 0.012 });
+  }
+}
+function startPath(pts, speed, done) {
+  cancelAuto();
+  const start = { x: knife.x, y: knife.y };
+  pts.unshift({ ...pts[0], lift: true });
+  const p = parkPos();
+  pts.push({ x: p.x, y: p.y, lift: true });
+  if (reduceMotion) {
+    let prev = null;
+    for (const q of pts) { if (prev && !q.lift) spreadSegment(prev, q); prev = q; }
+    checkReveal(); parkKnife(true); done && done(); return;
+  }
+  auto = { pts, i: 0, pos: start, speed: speed * S / 500, done };
+  knife.active = true; knife.parking = false;
+}
+function cancelAuto() { auto = null; }
+function stepAuto(dt) {
+  let remain = auto.speed * dt;
+  while (remain > 0 && auto && auto.i < auto.pts.length) {
+    const tgt = auto.pts[auto.i], dx = tgt.x - auto.pos.x, dy = tgt.y - auto.pos.y, d = Math.hypot(dx, dy);
+    let np;
+    if (d <= remain) { np = { x: tgt.x, y: tgt.y }; auto.i++; remain -= d; }
+    else { np = { x: auto.pos.x + (dx / d) * remain, y: auto.pos.y + (dy / d) * remain }; remain = 0; }
+    if (!tgt.lift) spreadSegment(auto.pos, np);
+    auto.pos = np;
+    setKnife(np);
+    if (tgt.lift) knife.targetAng = auto.i >= auto.pts.length ? parkPos().ang : BASE_ANG;
+  }
+  if (auto && auto.i >= auto.pts.length) {
+    const done = auto.done; auto = null;
+    checkReveal(); parkKnife(true); done && done();
+  }
+}
+function demoSpread() {
+  const pts = [], ry = geo.rowsY;
+  rowPass(ry[0] - S * 0.02, true, pts);
+  rowPass(ry[1], false, pts);
+  // a diagonal swipe down into the third row
+  pts.push({ x: geo.left + S * 0.05, y: ry[2] - S * 0.01 }, { x: geo.cx + S * 0.03, y: ry[2] + S * 0.01 });
+  startPath(pts, 0.42, showHint);
+}
+function spreadAll() {
+  const pts = [], ry = geo.rowsY;
+  rowPass(geo.y0 + geo.h * 0.12, true, pts);
+  ry.forEach((y, r) => rowPass(y, r % 2 === 1, pts));
+  rowPass(geo.y1 - geo.inset - S * 0.02, ry.length % 2 === 1, pts);
+  startPath(pts, 1.3, null);
+}
+
+/* ---------- Pointer ---------- */
+let drawing = false;
+const hint = $("hint");
+function showHint() { if (!userSpread) hint.classList.remove("off"); }
+let userSpread = false;
+function pt(e) {
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * S / r.width, y: (e.clientY - r.top) * S / r.height };
+}
+cv.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  cancelAuto();
+  userSpread = true; hint.classList.add("off");
+  drawing = true;
+  try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+  const p = pt(e);
+  setKnife(p); lastP = p;
+  spreadSegment(p, { x: p.x + 0.6, y: p.y });
+});
+cv.addEventListener("pointermove", (e) => {
+  if (auto) return;
+  const p = pt(e);
+  if (e.pointerType === "mouse" || drawing) setKnife(p);
+  if (drawing) { spreadSegment(lastP, p); lastP = p; }
+});
+function endDraw(e) {
+  if (!drawing) return;
+  drawing = false;
+  checkReveal();
+  if (e.pointerType !== "mouse") parkKnife(false);
+}
+cv.addEventListener("pointerup", endDraw);
+cv.addEventListener("pointercancel", endDraw);
+cv.addEventListener("pointerleave", () => { if (!drawing && !auto) parkKnife(false); });
+cv.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); spreadAll(); } });
+
+/* ---------- Loop ---------- */
+let prevT = performance.now();
+function loop(now) {
+  const dt = Math.min(40, now - prevT); prevT = now;
+  if (auto) stepAuto(dt);
+  if (knife.parking) {
+    const p = parkPos(), f = 1 - Math.pow(0.0001, dt / 1000 * 2.2);
+    knife.x += (p.x - knife.x) * f; knife.y += (p.y - knife.y) * f;
+    if (Math.hypot(p.x - knife.x, p.y - knife.y) < 0.5) { knife.x = p.x; knife.y = p.y; knife.parking = false; }
+    dirty = true;
+  }
+  const da = knife.targetAng - knife.ang;
+  if (Math.abs(da) > 0.002) { knife.ang += da * Math.min(1, dt / 90); dirty = true; }
+  if (spreadPending && now - lastCheck > 110) { lastCheck = now; checkReveal(); }
+  if (dirty && geo) { dirty = render(now); }
+  requestAnimationFrame(loop);
+}
+
+/* ---------- UI ---------- */
+function clearSlice() {
+  mctx.setTransform(1, 0, 0, 1, 0, 0); mctx.clearRect(0, 0, maskC.width, maskC.height);
+  stctx.setTransform(1, 0, 0, 1, 0, 0); stctx.clearRect(0, 0, streakC.width, streakC.height);
+  onSlice = new Set();
+  dirty = true;
+}
+function renderShelf() {
+  $("shelf").innerHTML = JARS.map((j, i) => `
+    <button class="jar" type="button" data-i="${i}" aria-pressed="${i === jarIdx}" style="--c:${j.color};--lid:${j.lid}">
+      <span class="glass" aria-hidden="true"><span>${j.tag}</span></span>
+      <span class="jar-name">${j.name}</span>
+    </button>`).join("");
+}
+function renderNow() {
+  const j = JARS[jarIdx];
+  document.documentElement.style.setProperty("--jar", j.color);
+  $("now").innerHTML = `<span class="dot" aria-hidden="true"></span><span>Now spreading <b>${j.name}</b></span><span class="kind">· ${j.kind}</span>`;
+}
+function renderCards() {
+  const j = JARS[jarIdx], f = found[j.id];
+  $("found-title").textContent = `Found in ${j.name}`;
+  $("found-count").textContent = `${f.size} of ${j.tools.length} found · ${j.kind}`;
+  $("cards").innerHTML = j.tools.map((t, i) => {
+    if (!f.has(i)) return `<article class="card hidden"><b>Still under the bread</b><small>Spread ${j.name.toLowerCase()} to uncover it</small></article>`;
+    const host = t.url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+    return `<article class="card${i === freshCard ? " fresh" : ""}">
+      <div class="row"><h3><span class="dot" aria-hidden="true"></span>${t.n}</h3><span class="lic" title="${t.lic}">${t.lic}</span></div>
+      <p>${t.d}</p>
+      <a href="${t.url}" target="_blank" rel="noopener noreferrer">${host} ↗</a>
+    </article>`;
+  }).join("");
+  freshCard = -1;
+}
+function family(l) {
+  if (/GPL/.test(l)) return "GPL family";
+  if (/^MIT/.test(l)) return "MIT";
+  if (/Apache/.test(l)) return "Apache-2.0";
+  if (/BSD/.test(l)) return "BSD family";
+  if (/MPL/.test(l)) return "MPL-2.0";
+  return "Other";
+}
+function renderFacts() {
+  const counts = { "MIT": 0, "Apache-2.0": 0, "GPL family": 0, "BSD family": 0, "MPL-2.0": 0, "Other": 0 };
+  let total = 0;
+  JARS.forEach((j) => found[j.id].forEach((i) => { counts[family(j.tools[i].lic)]++; total++; }));
+  $("facts-total").textContent = `${total} / ${TOTAL}`;
+  $("facts-list").innerHTML = Object.entries(counts).map(([k, v]) =>
+    `<li><span><b>${k}</b></span><span>${v}</span><span class="pct">${total ? Math.round((v / total) * 100) : 0}%</span></li>`).join("");
+}
+
+$("shelf").addEventListener("click", (e) => {
+  const b = e.target.closest(".jar"); if (!b) return;
+  const i = +b.dataset.i; if (i === jarIdx) return;
+  cancelAuto();
+  jarIdx = i;
+  clearSlice(); layoutSlots(); parkKnife(false);
+  renderShelf(); renderNow(); renderCards();
+  $("shelf").querySelector(`[data-i="${i}"]`).focus();
+});
+$("spread-all").addEventListener("click", () => { userSpread = true; hint.classList.add("off"); spreadAll(); });
+$("fresh").addEventListener("click", () => { cancelAuto(); clearSlice(); parkKnife(false); });
+
+renderShelf(); renderNow(); renderCards(); renderFacts();
+new ResizeObserver(() => resize()).observe(stageEl);
+resize();
+requestAnimationFrame(loop);
+
+let started = false;
+function start() {
+  if (started) return; started = true;
+  layoutSlots(); dirty = true;
+  setTimeout(demoSpread, reduceMotion ? 0 : 500);
+}
+if (document.fonts && document.fonts.load) {
+  document.fonts.load(`40px "Bagel Fat One"`).then(start, start);
+  setTimeout(start, 2000);
+} else start();
+</script>
+</body>
+</html>
